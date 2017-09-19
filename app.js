@@ -2,6 +2,9 @@ const express = require("express")
 const app= express()
 const PORT = 3000
 
+const body_parser = require('body-parser')
+app.use(body_parser.json())
+
 const rp = require('request-promise')
 
 const MDB = require('./module_mongodb')
@@ -56,8 +59,41 @@ app.get('/ten/:Ten', (req, res) => {
 	})
 })
 
+app.post('/search', (req, res) => {
+	let conditions = {$or : []}
+
+	let SBD = Number(req.body.SBD)
+	conditions.$or.push({SBD})
+
+	let temp = req.body.Ten
+	temp = standardize(temp)
+	temp = temp.split(" ")
+	let arr = []
+	for(let i=0;i<temp.length;i++) {
+		if(temp[i].charAt(0).toUpperCase()==temp[i].charAt(0)) {
+			let or = []
+			or.push({"Ten": new RegExp(`^${temp[i]} `)}) // Ho 
+			or.push({"Ten": new RegExp(` ${temp[i]} `)}) // Dem
+			or.push({"Ten": new RegExp(` ${temp[i]}$`)}) // Ten
+			// khong dau
+			or.push({"TenKhongDau": new RegExp(`^${temp[i]} `)}) // Ho 
+			or.push({"TenKhongDau": new RegExp(` ${temp[i]} `)}) // Dem
+			or.push({"TenKhongDau": new RegExp(` ${temp[i]}$`)}) // Ten
+			arr.push({$or: or})
+		}
+	}
+	if(arr.length) conditions.$or.push({$and: arr})
+
+	MDB.find(DATABASE, COLLECTION, conditions).then( (results) => {
+		res.send({error:false, data:results})
+	}).catch( (e) => {
+		res.send({error:true})
+		console.log(e)
+	})
+})
+
 // get data from web and insert to mongodb
-/*let j = 0
+let j = 0
 for(let i=SBD_MIN;i<=SBD_MAX;i++) {
 	getInformation(i).then( (results) => {
 		if(results==0) return 0
@@ -69,7 +105,7 @@ for(let i=SBD_MIN;i<=SBD_MAX;i++) {
 	}).catch( (e) => {
 		console.log(`i = ${i}`, e)
 	})
-}*/
+}
 
 function getInformation(sbd) {
 	return rp(`${URL}${sbd}`).then( (body) => {
@@ -91,10 +127,7 @@ function getInformation(sbd) {
 		let NangKhieu = standardize(temp[4].substring(0, temp[4].indexOf('<')))
 		let SoThich = standardize(temp[5].substring(0, temp[5].indexOf('<')))
 		let SoLuongTimVote = Number(dom.getElementsByClassName("text")[0].innerHTML)
-		let DuongDanAnh = []
-		for(let i=1;i<imgs.length;i+=2) {
-			DuongDanAnh.push(imgs[i].src)
-		}
+		let DuongDanAnh = imgs.filter( (elemtnt, index) => index%2 ).map( (element) => element.src)
 
 		let results = {SBD,Ten,TenKhongDau,Tinh_ThanhPho,ChieuCao,NangKhieu,SoThich,DuongDanAnh,SoLuongTimVote}
 		return results
