@@ -4,9 +4,8 @@ const PORT = 3000
 
 const rp = require('request-promise')
 
-const mongodb = require('mongodb')
-const MongoClient = mongodb.MongoClient
-const DB_URL = 'mongodb://localhost:27017/missteen'
+const MDB = require('./module_mongodb')
+const DATABASE = 'missteen'
 const COLLECTION = 'thisinh'
 
 const jsdom = require('jsdom')
@@ -22,7 +21,7 @@ app.listen(PORT, () => {
 
 app.get('/sbd/:SBD', (req, res) => {
 	let SBD = Number(req.params.SBD)
-	find({SBD}).then( (results) => {
+	MDB.find(DATABASE, COLLECTION, {SBD}).then( (results) => {
 		res.send({error:false, data:results})
 	}).catch( (e) => {
 		res.send({error:true})
@@ -49,7 +48,7 @@ app.get('/ten/:Ten', (req, res) => {
 		}
 	}
 	if(arr.length==0) res.send({error:false, data:[]})
-	else find({$and : arr}).then( (results) => {
+	else MDB.find(DATABASE, COLLECTION, {$and : arr}).then( (results) => {
 		res.send({error:false, data:results})
 	}).catch( (e) => {
 		res.send({error:true})
@@ -62,7 +61,7 @@ app.get('/ten/:Ten', (req, res) => {
 for(let i=SBD_MIN;i<=SBD_MAX;i++) {
 	getInformation(i).then( (results) => {
 		if(results==0) return 0
-		else return insert(results)
+		else return MDB.insertMany(DATABASE, COLLECTION, [results])
 	}).then( (v) => {
 		j++
 		if(j%50==0) console.log(j)
@@ -102,27 +101,7 @@ function getInformation(sbd) {
 	})
 }
 
-function insert(data) {
-	return MongoClient.connect(DB_URL).then( (db) => {
-		let collection = db.collection(COLLECTION)
-		return collection.insert(data).then( (results) => {
-			db.close()
-			return results
-		})
-	})
-}
-
-function find(conditions) {
-	return MongoClient.connect(DB_URL).then( (db) => {
-		let collection = db.collection(COLLECTION)
-		return collection.find(conditions, {_id:0}).toArray().then( (results) => {
-			db.close()
-			return results
-		})
-	})
-}
-
-let standardize = (string) => {
+function standardize(string) {
 	let str = string
 	let i = 0
 	let j = str.length - 1
@@ -145,7 +124,7 @@ let standardize = (string) => {
 	return str
 }
 
-let standardizeName = (name) => {
+function standardizeName(name) {
 	let str = standardize(name).toLowerCase()
 	str = str.replace('('," ( ")
 	str = str.replace('-'," - ")
@@ -161,7 +140,7 @@ let standardizeName = (name) => {
 	return str
 }
 
-let standardizeNameNoVietnamese = (name) => {
+function standardizeNameNoVietnamese(name) {
 	let str = name.toLowerCase()
 	str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a")
 	str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e")
