@@ -7,6 +7,8 @@ app.use(body_parser.json())
 
 const rp = require('request-promise')
 
+const STR = require('./module_string')
+
 const MDB = require('./module_mongodb')
 const DATABASE = 'missteen'
 const COLLECTION = 'thisinh'
@@ -15,7 +17,7 @@ const jsdom = require('jsdom')
 const {JSDOM } = jsdom
 
 const URL = "http://missteen.vn/thisinh-"
-const SBD_MIN = 1  // 14
+const SBD_MIN = 1401  // 14
 const SBD_MAX = 0  // 2063
 
 app.listen(PORT, () => {
@@ -34,7 +36,7 @@ app.get('/sbd/:SBD', (req, res) => {
 
 app.get('/ten/:Ten', (req, res) => {
 	let temp = req.params.Ten
-	temp = standardize(temp)
+	temp = STR.standardize(temp)
 	temp = temp.split(" ")
 	let arr = []
 	for(let i=0;i<temp.length;i++) {
@@ -66,23 +68,25 @@ app.post('/search', (req, res) => {
 	conditions.$or.push({SBD})
 
 	let temp = req.body.Ten
-	temp = standardize(temp)
-	temp = temp.split(" ")
-	let arr = []
-	for(let i=0;i<temp.length;i++) {
-		if(temp[i].charAt(0).toUpperCase()==temp[i].charAt(0)) {
-			let or = []
-			or.push({"Ten": new RegExp(`^${temp[i]} `)}) // Ho 
-			or.push({"Ten": new RegExp(` ${temp[i]} `)}) // Dem
-			or.push({"Ten": new RegExp(` ${temp[i]}$`)}) // Ten
-			// khong dau
-			or.push({"TenKhongDau": new RegExp(`^${temp[i]} `)}) // Ho 
-			or.push({"TenKhongDau": new RegExp(` ${temp[i]} `)}) // Dem
-			or.push({"TenKhongDau": new RegExp(` ${temp[i]}$`)}) // Ten
-			arr.push({$or: or})
+	if(temp) {
+		temp = STR.standardize(temp)
+		temp = temp.split(" ")
+		let arr = []
+		for(let i=0;i<temp.length;i++) {
+			if(temp[i].charAt(0).toUpperCase()==temp[i].charAt(0)) {
+				let or = []
+				or.push({"Ten": new RegExp(`^${temp[i]} `)}) // Ho 
+				or.push({"Ten": new RegExp(` ${temp[i]} `)}) // Dem
+				or.push({"Ten": new RegExp(` ${temp[i]}$`)}) // Ten
+				// khong dau
+				or.push({"TenKhongDau": new RegExp(`^${temp[i]} `)}) // Ho 
+				or.push({"TenKhongDau": new RegExp(` ${temp[i]} `)}) // Dem
+				or.push({"TenKhongDau": new RegExp(` ${temp[i]}$`)}) // Ten
+				arr.push({$or: or})
+			}
 		}
+		if(arr.length) conditions.$or.push({$and: arr})
 	}
-	if(arr.length) conditions.$or.push({$and: arr})
 
 	MDB.find(DATABASE, COLLECTION, conditions).then( (results) => {
 		res.send({error:false, data:results})
@@ -116,72 +120,19 @@ function getInformation(sbd) {
 		let imgs = dom.getElementsByClassName('slider')[0].getElementsByTagName("img")
 	
 		let SBD = sbd
-		let Ten = standardizeName(dom.getElementsByTagName('title')[0].innerHTML)
-		let TenKhongDau = standardizeNameNoVietnamese(Ten)
-		let Tinh_ThanhPho = standardizeName(div.getElementsByTagName('span')[0].innerHTML)
-		let ChieuCao = standardize(temp[2].substring(0, temp[2].indexOf('<')))
-		//ChieuCao = ChieuCao.replace("cm","")
-		//ChieuCao = ChieuCao.replace("m","")
-		//ChieuCao = Number(ChieuCao)
-		//if(isNaN(ChieuCao)) console.log(i, ChieuCao)
-		let NangKhieu = standardize(temp[4].substring(0, temp[4].indexOf('<')))
-		let SoThich = standardize(temp[5].substring(0, temp[5].indexOf('<')))
+		let Ten = STR.standardizeName(dom.getElementsByTagName('title')[0].innerHTML)
+		let TenKhongDau = STR.removeVietnamese(Ten)
+		let Tinh_ThanhPho = STR.standardizeName(div.getElementsByTagName('span')[0].innerHTML)
+		let ChieuCao = STR.standardize(temp[2].substring(0, temp[2].indexOf('<')))
+		let NangKhieu = STR.standardize(temp[4].substring(0, temp[4].indexOf('<')))
+		let SoThich = STR.standardize(temp[5].substring(0, temp[5].indexOf('<')))
 		let SoLuongTimVote = Number(dom.getElementsByClassName("text")[0].innerHTML)
-		let DuongDanAnh = imgs.filter( (elemtnt, index) => index%2 ).map( (element) => element.src)
+		let DuongDanAnh = []
+		for(let j=1;j<imgs.length;j+=2) {
+			DuongDanAnh.push(imgs[j].src)
+		}
 
 		let results = {SBD,Ten,TenKhongDau,Tinh_ThanhPho,ChieuCao,NangKhieu,SoThich,DuongDanAnh,SoLuongTimVote}
 		return results
 	})
-}
-
-function standardize(string) {
-	let str = string
-	let i = 0
-	let j = str.length - 1
-	while(str.charAt(i)==" " || str.charAt(i)=="\n") {
-		i++
-	}
-	while(str.charAt(j)==" " || str.charAt(j)=="\n") {
-		j--
-	}
-	str = str.substring(i, j+1)
-	for(let k=0;k<str.length;k++) {
-		if(str.charAt(k)==" ") {
-			let l = k
-			while(str.charAt(l)==' ') {
-				l++
-			}
-			str = str.substring(0,k+1) + str.substring(l)
-		}
-	}
-	return str
-}
-
-function standardizeName(name) {
-	let str = standardize(name).toLowerCase()
-	str = str.replace('('," ( ")
-	str = str.replace('-'," - ")
-	str = standardize(str)
-	str = str.charAt(0).toUpperCase() + str.substring(1)
-	for(let i=1;i<str.length;i++) {
-		if(str.charAt(i-1)==" ") {
-			let oldStr = str.substring(i-1,i+1)
-			let newStr = oldStr.toUpperCase()
-			str = str.replace(oldStr,newStr)
-		}
-	}
-	return str
-}
-
-function standardizeNameNoVietnamese(name) {
-	let str = name.toLowerCase()
-	str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a")
-	str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e")
-	str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i")
-	str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o")
-	str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u")
-	str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y")
-	str = str.replace(/đ/g, "d")
-	str = standardizeName(str)
-	return str;
 }
