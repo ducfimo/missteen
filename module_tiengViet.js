@@ -20,7 +20,7 @@ module.exports = {
 		let results = str
 		for(let [key,value] of entries(this.OBJ))
 			value.forEach( (v) => {
-				results = results.replace(v,key)
+				results = results.replace(new RegExp(v,'g'),key)
 			})
 		return results
 	},

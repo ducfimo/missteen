@@ -6,7 +6,7 @@ const {JSDOM } = jsdom
 const STR = require('./module_string')
 
 const URL_BEGIN = "http://missteen.vn/thisinh-"
-const SBD_MIN = 1401  // 14
+const SBD_MIN = 1001  // 14
 const SBD_MAX = 2100  // 2063
 
 const MDB = require('./module_mongodb')
