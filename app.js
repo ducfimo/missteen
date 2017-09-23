@@ -5,8 +5,6 @@ const PORT = 3000
 const body_parser = require('body-parser')
 app.use(body_parser.json())
 
-const STR = require('./module_string')
-
 const MDB = require('./module_mongodb')
 const DATABASE = 'missteen'
 const COLLECTION = 'thisinh'
@@ -26,25 +24,10 @@ app.get('/sbd/:SBD', (req, res) => {
 })
 
 app.get('/ten/:Ten', (req, res) => {
-	let temp = req.params.Ten
-	temp = STR.standardize(temp)
-	temp = temp.split(" ")
-	let arr = []
-	for(let i=0;i<temp.length;i++) {
-		if(temp[i].charAt(0).toUpperCase()==temp[i].charAt(0)) {
-			let or = []
-			or.push({"Ten": new RegExp(`^${temp[i]} `)}) // Ho 
-			or.push({"Ten": new RegExp(` ${temp[i]} `)}) // Dem
-			or.push({"Ten": new RegExp(` ${temp[i]}$`)}) // Ten
-			// khong dau
-			or.push({"TenKhongDau": new RegExp(`^${temp[i]} `)}) // Ho 
-			or.push({"TenKhongDau": new RegExp(` ${temp[i]} `)}) // Dem
-			or.push({"TenKhongDau": new RegExp(` ${temp[i]}$`)}) // Ten
-			arr.push({$or: or})
-		}
-	}
-	if(arr.length==0) res.send({error:false, data:[]})
-	else MDB.find(DATABASE, COLLECTION, {$and : arr}).then( (results) => {
+	let Ten = req.params.Ten
+	let cond = makeOrCondition({Ten})
+	if(cond.$or.length==0) res.send({error:false, data:[]})
+	else MDB.find(DATABASE, COLLECTION, cond).then( (results) => {
 		res.send({error:false, data:results})
 	}).catch( (e) => {
 		res.send({error:true})
@@ -53,36 +36,37 @@ app.get('/ten/:Ten', (req, res) => {
 })
 
 app.post('/search', (req, res) => {
-	let array = []
-
-	let SBD = Number(req.body.SBD)
-	array.push({SBD})
-
-	let temp = req.body.Ten
-	if(temp) {
-		temp = STR.standardize(temp)
-		temp = temp.split(" ")
-		let arr = []
-		for(let i=0;i<temp.length;i++) {
-			if(temp[i].charAt(0).toUpperCase()==temp[i].charAt(0)) {
-				let or = []
-				or.push({"Ten": new RegExp(`^${temp[i]} `)}) // Ho 
-				or.push({"Ten": new RegExp(` ${temp[i]} `)}) // Dem
-				or.push({"Ten": new RegExp(` ${temp[i]}$`)}) // Ten
-				// khong dau
-				or.push({"TenKhongDau": new RegExp(`^${temp[i]} `)}) // Ho 
-				or.push({"TenKhongDau": new RegExp(` ${temp[i]} `)}) // Dem
-				or.push({"TenKhongDau": new RegExp(` ${temp[i]}$`)}) // Ten
-				arr.push({$or: or})
-			}
-		}
-		if(arr.length) array.push({$and: arr})
-	}
-
-	MDB.find(DATABASE, COLLECTION, {$or : array}).then( (results) => {
+	let cond = makeOrCondition(req.body)
+	if(cond.$or.length==0) res.send({error:false, data:[]})
+	else MDB.find(DATABASE, COLLECTION, cond).then( (results) => {
 		res.send({error:false, data:results})
 	}).catch( (e) => {
 		res.send({error:true})
 		console.log(e)
 	})
 })
+
+function makeOrCondition(body) {
+	let $or = []
+	if(body.SBD) {
+		let SBD = Number(body.SBD)
+		$or.push({SBD})
+	}
+	if(body.Ten) {
+		let temp = body.Ten
+		temp = temp.match(/(\S)+/g)
+		if(temp) {
+			let arr = []
+			temp.forEach( v => {
+				if(v.charAt(0).toUpperCase()==v.charAt(0)) {
+					let or = []
+					or.push({Ten: new RegExp(`^${v} | ${v} | ${v}$`)})
+					or.push({TenKhongDau: new RegExp(`^${v} | ${v} | ${v}$`)})
+					arr.push({$or: or})
+				}
+			})
+			if(arr.length) $or.push({$and: arr})
+		}
+	}
+	return {$or}
+}
