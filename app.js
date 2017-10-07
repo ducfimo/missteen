@@ -5,7 +5,7 @@ const PORT = 3000
 const body_parser = require('body-parser')
 app.use(body_parser.json())
 
-const MDB = require('./module_mongodb')
+const MDB = require('./module/mongodb')
 const DATABASE = 'missteen'
 const COLLECTION = 'thisinh'
 
